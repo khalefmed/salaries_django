@@ -1,12 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Etablissement, Banque, Salarie, Cheque, Etat
+from .models import Etablissement, Banque, Salarie, Cheque, Etat, Utilisateur
 
 Utilisateur = get_user_model()
 
 class ConnexionSerializer(serializers.Serializer):
     telephone = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    mot_de_passe = serializers.CharField(write_only=True)
 
 class EtablissementSerializer(serializers.ModelSerializer):
     class Meta:
