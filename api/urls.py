@@ -5,6 +5,9 @@ from .views import *
 
 urlpatterns = [
 
+    path('acceuil/', acceuil, name='acceuil'),
+    path('acceuil/etablissement', acceuil_etablissement, name='acceuil-etablissement'),
+
     # Etablissement URLs
     path('etablissements/', EtablissementListCreate.as_view(), name='etablissement-list-create'),
     path('etablissements/<int:pk>/', EtablissementRetrieveUpdateDestroy.as_view(), name='etablissement-detail'),
@@ -23,11 +26,17 @@ urlpatterns = [
     # Cheque URLs
     path('cheques/', ChequeListCreate.as_view(), name='cheque-list-create'),
     path('cheques/<int:pk>/', ChequeRetrieveUpdateDestroy.as_view(), name='cheque-detail'),
+    path('cheques_etablissement/', cheque_etablissement, name='cheque-etablissement'),
     path('recherche/cheques/', rechercher_cheque, name='recherche-cheque'),
 
     # Etat URLs
     path('etats/', EtatListCreate.as_view(), name='etat-list-create'),
+    path('creer_etat/', creer_etat, name='creer-etat'),
+    path('etats_etablissement/', EtatEtablissementListCreate.as_view(), name='etat-etablissement-list-create'),
+    path('etats_salaries/<int:id>', etats_salaries, name='etat-etablissement-list-create'),
     path('etats/<int:pk>/', EtatRetrieveUpdateDestroy.as_view(), name='etat-detail'),
+    path('recherche/etats/', rechercher_etat, name='recherche-etat'),
+    path('recherche/etats_etablissement/', rechercher_etat_etablissement, name='recherche-etat'),
 
     # User URLs
     path('utilisateurs/', UtilisateurListCreate.as_view(), name='user-list-create'),
@@ -36,5 +45,5 @@ urlpatterns = [
 
     path('connexion/', SeConnecter.as_view(), name='connexion'),
     path('profil/', Utilisateur_profil, name='profile-view'),
-    path('modifier_mot_de_passe/', modifier_mot_de_passe, name='update-password'),
+    path('modifier_mot_de_passe/', modifier_mot_de_passe, name='modifier-mot-passe'),
 ]

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password
+from datetime import datetime
 
 
 class Etablissement(models.Model):
@@ -32,19 +33,30 @@ class Salarie(models.Model):
 class Cheque(models.Model):
     numero_cheque = models.IntegerField()
     nom_cheque = models.CharField(max_length=50)
+    etablissement = models.ForeignKey(Etablissement, related_name='cheque_etablissement', on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return str(self.nom_cheque)
 
 
 class Etat(models.Model):
-    montant_net = models.DecimalField(max_digits=15, decimal_places=2)
-    date_etat = models.DateField()
-    salarie = models.ForeignKey(Salarie, related_name='salarie', on_delete=models.CASCADE)
+    nom_etat = models.CharField(max_length=50, default="Etat")
+    date_etat = models.DateField(null=True)
     cheque = models.ForeignKey(Cheque, related_name='cheque', on_delete=models.CASCADE)
+    etablissement = models.ForeignKey(Etablissement, related_name='etat_etablissement', on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        return str(self.nom_etat)
+    
+class EtatSalarie(models.Model):
+    montant_net = models.DecimalField(max_digits=15, decimal_places=2)
+    salarie = models.ForeignKey(Salarie, related_name='salarie', on_delete=models.CASCADE)
+    etat = models.ForeignKey(Etat, related_name='etat', on_delete=models.CASCADE)
 
     def __str__(self):
         return str(self.salarie)
+
+
 
 
 class Utilisateur(AbstractUser):

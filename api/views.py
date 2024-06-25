@@ -4,6 +4,10 @@ from api.permissions import *
 from .models import *
 from .serializers import *
 
+from django.db import transaction
+
+import pandas as pd
+
 from rest_framework.decorators import api_view, permission_classes
 from django.utils.crypto import get_random_string
 
@@ -29,6 +33,73 @@ import json
 
 from django.db.models import Q, Avg, Sum, Count
 
+@api_view(['GET'])
+def acceuil(request):
+    total_etablissements = Etablissement.objects.count()
+    total_banques = Banque.objects.count()
+    total_salaries = Salarie.objects.count()
+    total_cheques = Cheque.objects.count()
+    total_etats = Etat.objects.count()
+    total_utilisateurs = Utilisateur.objects.count()
+    plus_eleve = Salarie.objects.order_by('-salaire').first()
+    statistiques = Salarie.objects.aggregate(
+        moyenne_salaires=Avg('salaire'),
+        total_salaires=Sum('salaire'),
+    )
+    moyenne_salaires = 0
+    total_salaires = 0
+    
+    if moyenne_salaires is not None :
+        moyenne_salaires = statistiques['moyenne_salaires']
+
+    if total_salaires is not None :
+        total_salaires = statistiques['total_salaires']
+
+    donnees = {
+        'total_etablissements': total_etablissements,
+        'total_banques': total_banques,
+        'total_salaries': total_salaries,
+        'total_cheques': total_cheques,
+        'total_etats': total_etats,
+        'total_utilisateurs': total_utilisateurs,
+        'total_salaires': total_salaires,
+        'moyenne_salaires': moyenne_salaires,
+        'plus_eleve': plus_eleve.salaire,
+    }
+    return Response(donnees)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def acceuil_etablissement(request):
+    utilisateur = request.user
+    total_salaries = Salarie.objects.filter(etablissement=utilisateur.etablissement).count()
+    total_etats = EtatSalarie.objects.filter(salarie__etablissement=utilisateur.etablissement).count()
+    plus_eleve = Salarie.objects.filter(etablissement=utilisateur.etablissement).order_by('-salaire').first()
+    moins_eleve = Salarie.objects.filter(etablissement=utilisateur.etablissement).order_by('salaire').first()
+    statistiques = Salarie.objects.filter(etablissement=utilisateur.etablissement).aggregate(
+        moyenne_salaires=Avg('salaire'),
+        total_salaires=Sum('salaire'),
+    )
+    moyenne_salaires = 0
+    total_salaires = 0
+    
+    if moyenne_salaires is not None :
+        moyenne_salaires = statistiques['moyenne_salaires']
+
+    if total_salaires is not None :
+        total_salaires = statistiques['total_salaires']
+
+    donnees = {
+        'total_salaries': total_salaries,
+        'total_etats': total_etats,
+        'total_salaires': total_salaires,
+        'moyenne_salaires': moyenne_salaires,
+        'plus_eleve': plus_eleve.salaire,
+        'moins_eleve': moins_eleve.salaire,
+    }
+    return Response(donnees)
+
 class EtablissementListCreate(generics.ListCreateAPIView):
     queryset = Etablissement.objects.all()
 
@@ -48,8 +119,6 @@ class EtablissementListCreate(generics.ListCreateAPIView):
         )
 
         statistiques['total'] = len(liste)
-
-        
 
         response_data = {
             'statistiques': statistiques,
@@ -149,6 +218,9 @@ class SalarieListCreate(generics.ListCreateAPIView):
             return SalarieSerializer
         return SalarieCustomSerializer
 
+    def perform_create(self, serializer):
+        serializer.save(etablissement=self.request.user.etablissement)
+
     def get(self, request, *args, **kwargs):
         utilisateur = request.user
 
@@ -215,15 +287,12 @@ class ChequeListCreate(generics.ListCreateAPIView):
         liste = self.get_serializer(queryset, many=True).data
 
         statistiques = {}
-    
-        
+      
         statistiques['total'] = len(liste)
         statistiques['nombre_comptes'] = Salarie.objects.count()
-        
-        
 
         for cheque in liste :
-            montant = Etat.objects.aggregate(montant=Sum('montant_net')) 
+            montant = EtatSalarie.objects.aggregate(montant=Sum('montant_net')) 
             if montant['montant'] :
                 montant = montant['montant']
             else :
@@ -253,7 +322,7 @@ def rechercher_cheque(request):
             cheques = Cheque.objects.filter(Q(nom_cheque__icontains=valeur) | Q(numero_cheque__icontains=valeur))
             cheques = ChequeCustomSerializer(cheques, many=True).data
             for cheque in cheques :
-                montant = Etat.objects.aggregate(montant=Sum('montant_net')) 
+                montant = EtatSalarie.objects.aggregate(montant=Sum('montant_net')) 
                 if montant['montant'] :
                     montant = montant['montant']
                 else :
@@ -265,7 +334,7 @@ def rechercher_cheque(request):
             cheques = Cheque.objects.all()
             cheques = ChequeCustomSerializer(cheques, many=True).data
             for cheque in cheques :
-                montant = Etat.objects.aggregate(montant=Sum('montant_net')) 
+                montant = EtatSalarie.objects.aggregate(montant=Sum('montant_net')) 
                 if montant['montant'] :
                     montant = montant['montant']
                 else :
@@ -296,6 +365,142 @@ class EtatListCreate(generics.ListCreateAPIView):
         if self.request.method in ['POST', 'PUT']:
             return EtatSerializer
         return EtatCustomSerializer
+
+    def get(self, request, *args, **kwargs):
+
+        queryset = self.get_queryset()
+        liste = self.get_serializer(queryset, many=True).data
+        statistiques = {}
+
+        # statistiques = Salarie.objects.filter().aggregate(
+        #     moyenne_salaires=Avg('salaire'),
+        # )
+        # statistiques['nombre_comptes'] = Salarie.objects.count()
+        statistiques['total'] = len(liste)
+        response_data = {
+            'statistiques': statistiques,
+            'liste': liste
+        }
+        return Response(response_data, status=200)
+
+
+    
+class EtatEtablissementListCreate(generics.ListCreateAPIView):
+    queryset = Etat.objects.all()
+
+    def get_serializer_class(self):
+        if self.request.method in ['POST', 'PUT']:
+            return EtatSerializer
+        return EtatCustomSerializer
+
+    def get(self, request, *args, **kwargs):
+        utilisateur = request.user
+
+        queryset = self.get_queryset().filter(etablissement=utilisateur.etablissement)
+        liste = self.get_serializer(queryset, many=True).data
+        statistiques = {}
+
+        statistiques['total'] = len(liste)
+        response_data = {
+            'statistiques': statistiques,
+            'liste': liste
+        }
+        return Response(response_data, status=200)
+
+    def perform_create(self, serializer):
+        serializer.save(etablissement=self.request.user.etablissement)
+    
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def creer_etat(request):
+    if request.method == 'POST':
+        serializer = EtatSerializer(data=request.data)
+        if serializer.is_valid():
+            etat = serializer.save(etablissement=request.user.etablissement)
+            sheet_url = 'https://docs.google.com/spreadsheets/d/1SDPNRGIVybFcJKJvA4gtIreMJGA86EpiPAlVeTlvYS4'
+
+            df = pd.read_csv(f'{sheet_url}/export?format=csv')
+
+            creer_etats_salaries(df, etat)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@transaction.atomic
+def creer_etats_salaries(df, etat):
+    for index, row in df.iterrows():
+        nni = row['nni']
+        montant_net = row['montant_net']
+
+        try:
+            salarie = Salarie.objects.filter(nni=nni).first()
+            EtatSalarie.objects.create(
+                montant_net=int(montant_net),
+                salarie=salarie,
+                etat=etat
+            )
+        except Salarie.DoesNotExist:
+          print(f"Le salarie n'existe pas")
+
+
+@api_view(['GET'])
+def etats_salaries(request, id):
+    try:
+        etats = EtatSalarie.objects.filter(etat__id=id)
+        print(etats[0].salarie.nom_salarie)
+        etats = EtatSalarieCustomSerializer(etats, many=True).data
+
+        return Response(etats)
+
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+    
+
+
+
+@api_view(['GET'])
+def rechercher_etat(request):
+    valeur = request.query_params.get('valeur', None)
+    try:
+        if valeur != "":
+            etats = Etat.objects.filter(nom_etat__icontains=valeur)
+            etats = EtatCustomSerializer(etats, many=True).data
+            return Response(etats)
+        else :
+            etats = Etat.objects.all()
+            etats = EtatCustomSerializer(etats, many=True).data
+            return Response(etats)
+
+
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def rechercher_etat_etablissement(request):
+    utilisateur = request.user
+    valeur = request.query_params.get('valeur', None)
+    try:
+        if valeur != "":
+            etats = Etat.objects.filter(nom_etat__icontains=valeur, etablissement=utilisateur.etablissement)
+            etats = EtatCustomSerializer(etats, many=True).data
+            return Response(etats)
+        else :
+            etats = Etat.objects.filter(etablissement=utilisateur.etablissement)
+            etats = EtatCustomSerializer(etats, many=True).data
+            return Response(etats)
+
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
 
 
 
@@ -363,6 +568,19 @@ class UtilisateurRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ['PUT', 'PATCH']:
             return UtilisateurSerializer
         return UtilisateurCustomSerializer
+
+
+@api_view(['GET'])
+def cheque_etablissement(request):
+    utilisateur = request.user
+    try:
+        cheques = Cheque.objects.filter(etablissement=utilisateur.etablissement)
+        cheques = ChequeSerializer(cheques, many=True).data
+        return Response(cheques)
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
     
 class RegisterView(APIView):
     def post(self, request):

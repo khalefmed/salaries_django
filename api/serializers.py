@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Etablissement, Banque, Salarie, Cheque, Etat, Utilisateur
+from .models import Etablissement, Banque, Salarie, Cheque, Etat, Utilisateur, EtatSalarie
 
 Utilisateur = get_user_model()
 
@@ -15,6 +15,7 @@ class EtablissementSerializer(serializers.ModelSerializer):
 
 
 class SalarieSerializer(serializers.ModelSerializer):
+    etablissement = serializers.PrimaryKeyRelatedField(queryset=Etablissement.objects.all(), required=False)
     class Meta:
         model = Salarie
         fields = '__all__'
@@ -77,11 +78,19 @@ class ChequeCustomSerializer(serializers.ModelSerializer):
 
 
 class EtatCustomSerializer(serializers.ModelSerializer):
-    salarie = SalarieSerializer()
     cheque = ChequeSerializer()
+    etablissement = EtablissementSerializer()
 
     class Meta:
         model = Etat
+        fields = '__all__'
+
+class EtatSalarieCustomSerializer(serializers.ModelSerializer):
+    salarie = SalarieSerializer()
+    etat = EtatSerializer()
+
+    class Meta:
+        model = EtatSalarie
         fields = '__all__'
 
 class UtilisateurCustomSerializer(serializers.ModelSerializer):
