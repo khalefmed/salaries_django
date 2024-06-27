@@ -86,7 +86,7 @@ class EtatCustomSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class EtatSalarieCustomSerializer(serializers.ModelSerializer):
-    salarie = SalarieSerializer()
+    salarie = SalarieCustomSerializer()
     etat = EtatSerializer()
 
     class Meta:

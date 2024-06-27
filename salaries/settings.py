@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-
+import dj_database_url
 from datetime import timedelta
 from pathlib import Path
 
@@ -144,6 +144,12 @@ DATABASES = {
     }
 }
 
+DATABASES['default'] = dj_database_url.parse('postgresql://salaries_bd_user:D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS@dpg-cpupg6qj1k6c738fbri0-a.oregon-postgres.render.com/salaries_bd')
+# salaries_bd_user
+# D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS
+# postgresql://salaries_bd_user:D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS@dpg-cpupg6qj1k6c738fbri0-a/salaries_bd
+# postgresql://salaries_bd_user:D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS@dpg-cpupg6qj1k6c738fbri0-a.oregon-postgres.render.com/salaries_bd
+# PGPASSWORD=D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS psql -h dpg-cpupg6qj1k6c738fbri0-a.oregon-postgres.render.com -U salaries_bd_user salaries_bd
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

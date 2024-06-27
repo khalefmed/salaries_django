@@ -409,17 +409,20 @@ class EtatEtablissementListCreate(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(etablissement=self.request.user.etablissement)
-    
+
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def creer_etat(request):
     if request.method == 'POST':
         serializer = EtatSerializer(data=request.data)
         if serializer.is_valid():
             etat = serializer.save(etablissement=request.user.etablissement)
-            sheet_url = 'https://docs.google.com/spreadsheets/d/1SDPNRGIVybFcJKJvA4gtIreMJGA86EpiPAlVeTlvYS4'
+            # sheet_url = 'https://docs.google.com/spreadsheets/d/1SDPNRGIVybFcJKJvA4gtIreMJGA86EpiPAlVeTlvYS4'
+            sheet_url = request.user.etablissement.url_fichier
+            print(request.user.etablissement.url_fichier)
 
             df = pd.read_csv(f'{sheet_url}/export?format=csv')
 
@@ -459,8 +462,6 @@ def etats_salaries(request, id):
             "erreur": f"{e}"
         }, status=500)
     
-
-
 
 @api_view(['GET'])
 def rechercher_etat(request):

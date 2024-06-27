@@ -1,12 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password
-from datetime import datetime
+from datetime import date
 
 
 class Etablissement(models.Model):
     nom_etablissement = models.CharField(max_length=50)
     code_etablissement = models.CharField(max_length=50)
+    url_fichier = models.CharField(max_length=150)
 
     def __str__(self):
         return str(self.code_etablissement)
@@ -33,7 +34,7 @@ class Salarie(models.Model):
 class Cheque(models.Model):
     numero_cheque = models.IntegerField()
     nom_cheque = models.CharField(max_length=50)
-    etablissement = models.ForeignKey(Etablissement, related_name='cheque_etablissement', on_delete=models.CASCADE, null=True)
+    etablissement = models.ForeignKey(Etablissement, related_name='cheque_etablissement', on_delete=models.CASCADE)
 
     def __str__(self):
         return str(self.nom_cheque)
@@ -41,7 +42,7 @@ class Cheque(models.Model):
 
 class Etat(models.Model):
     nom_etat = models.CharField(max_length=50, default="Etat")
-    date_etat = models.DateField(null=True)
+    date_etat = models.DateField(default=date.today)
     cheque = models.ForeignKey(Cheque, related_name='cheque', on_delete=models.CASCADE)
     etablissement = models.ForeignKey(Etablissement, related_name='etat_etablissement', on_delete=models.CASCADE, null=True)
 
@@ -69,8 +70,8 @@ class Utilisateur(AbstractUser):
     def __str__(self):
         return str(self.username)
 
-    def save(self, *args, **kwargs):
-        if not self.pk:
-            self.password = make_password(self.password)
-        super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     if not self.pk:
+    #         self.password = make_password(self.password)
+    #     super().save(*args, **kwargs)
 
