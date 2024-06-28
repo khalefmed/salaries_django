@@ -70,8 +70,8 @@ class Utilisateur(AbstractUser):
     def __str__(self):
         return str(self.username)
 
-    # def save(self, *args, **kwargs):
-    #     if not self.pk:
-    #         self.password = make_password(self.password)
-    #     super().save(*args, **kwargs)
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
 
