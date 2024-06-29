@@ -145,7 +145,7 @@ DATABASES = {
     }
 }
 
-DATABASES['default'] = dj_database_url.parse('postgresql://salaries_bd_user:D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS@dpg-cpupg6qj1k6c738fbri0-a.oregon-postgres.render.com/salaries_bd')
+# DATABASES['default'] = dj_database_url.parse('postgresql://salaries_bd_user:D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS@dpg-cpupg6qj1k6c738fbri0-a.oregon-postgres.render.com/salaries_bd')
 # salaries_bd_user
 # D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS
 # postgresql://salaries_bd_user:D2rhJZra3HXqNw007ZTn2dUg5ncpcHSS@dpg-cpupg6qj1k6c738fbri0-a/salaries_bd
