@@ -292,6 +292,7 @@ class ChequeListCreate(generics.ListCreateAPIView):
         statistiques['nombre_comptes'] = Salarie.objects.count()
 
         for cheque in liste :
+            print(cheque)
             montant = EtatSalarie.objects.aggregate(montant=Sum('montant_net')) 
             if montant['montant'] :
                 montant = montant['montant']

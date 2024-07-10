@@ -7,7 +7,7 @@ from datetime import date
 class Etablissement(models.Model):
     nom_etablissement = models.CharField(max_length=50)
     code_etablissement = models.CharField(max_length=50)
-    url_fichier = models.CharField(max_length=150)
+    url_fichier = models.CharField(max_length=150, blank=True)
 
     def __str__(self):
         return str(self.code_etablissement)
