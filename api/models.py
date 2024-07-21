@@ -8,6 +8,7 @@ class Etablissement(models.Model):
     nom_etablissement = models.CharField(max_length=50)
     code_etablissement = models.CharField(max_length=50)
     url_fichier = models.CharField(max_length=150, blank=True)
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return str(self.code_etablissement)
@@ -15,6 +16,7 @@ class Etablissement(models.Model):
 class Banque(models.Model):
     nom_banque = models.CharField(max_length=50)
     code_banque = models.CharField(max_length=50)
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return str(self.code_banque)
@@ -27,27 +29,27 @@ class Salarie(models.Model):
     numero_compte = models.IntegerField()
     banque = models.ForeignKey(Banque, related_name='banque', on_delete=models.CASCADE)
     etablissement = models.ForeignKey(Etablissement, related_name='etablissement', on_delete=models.CASCADE)
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return str(self.nom_salarie)
-    
-class Cheque(models.Model):
-    numero_cheque = models.IntegerField()
-    nom_cheque = models.CharField(max_length=50)
-    etablissement = models.ForeignKey(Etablissement, related_name='cheque_etablissement', on_delete=models.CASCADE)
-
-    def __str__(self):
-        return str(self.nom_cheque)
 
 
 class Etat(models.Model):
     nom_etat = models.CharField(max_length=50, default="Etat")
     date_etat = models.DateField(default=date.today)
-    cheque = models.ForeignKey(Cheque, related_name='cheque', on_delete=models.CASCADE)
     etablissement = models.ForeignKey(Etablissement, related_name='etat_etablissement', on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return str(self.nom_etat)
+
+class Cheque(models.Model):
+    numero_cheque = models.IntegerField()
+    nom_cheque = models.CharField(max_length=50)
+    etat = models.ForeignKey(Etat, related_name='etats', on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        return str(self.nom_cheque)
     
 class EtatSalarie(models.Model):
     montant_net = models.DecimalField(max_digits=15, decimal_places=2)

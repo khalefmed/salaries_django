@@ -1,3 +1,4 @@
+from datetime import timedelta
 from rest_framework import generics
 
 from api.permissions import *
@@ -5,6 +6,8 @@ from .models import *
 from .serializers import *
 
 from django.db import transaction
+
+from django.db.models.functions import TruncMonth
 
 import pandas as pd
 
@@ -48,6 +51,51 @@ def acceuil(request):
     )
     moyenne_salaires = 0
     total_salaires = 0
+
+
+    today = date.today()
+    three_months_ago = today - timedelta(days=3*30)
+
+    distribution_salaries = EtatSalarie.objects.filter(
+        etat__date_etat__gte=three_months_ago
+    ).annotate(
+        month=TruncMonth('etat__date_etat')
+    ).values(
+        'month'
+    ).annotate(
+        total_amount=Sum('montant_net')
+    ).order_by('month')
+
+
+    all_months = [(today - timedelta(days=i*30)).replace(day=1) for i in range(3)]
+    all_months.reverse()
+
+    distribution_dict = {entry['month']: entry['total_amount'] for entry in distribution_salaries}
+
+    salaries_recents = []
+    for month in all_months:
+        mois = month.month
+        montant = distribution_dict.get(month, 0) 
+        d = {
+            "mois": mois,
+            "montant": montant
+        }
+        salaries_recents.append(d)
+    
+
+    # Annoter les établissements avec le nombre de salariés et trier par ce nombre
+    # top_etablissements = Etablissement.objects.annotate(
+    #     num_salaries=Count('salaries')
+    # ).order_by('-num_salaries')[:5]
+
+    # # Préparer les résultats dans le format souhaité
+    # etablissements_recents = []
+    # for etablissement in top_etablissements:
+    #     d = {
+    #         "nom_etablissement": etablissement.nom_etablissement,
+    #         "num_salaries": etablissement.num_salaries
+    #     }
+    #     etablissements_recents.append(d)
     
     if moyenne_salaires is not None :
         moyenne_salaires = statistiques['moyenne_salaires']
@@ -65,6 +113,8 @@ def acceuil(request):
         'total_salaires': total_salaires,
         'moyenne_salaires': moyenne_salaires,
         'plus_eleve': plus_eleve.salaire,
+        'salaries_recents': salaries_recents,
+        # 'etablissements_salaries': etablissements_recents,
     }
     return Response(donnees)
 
@@ -117,6 +167,9 @@ class EtablissementListCreate(generics.ListCreateAPIView):
             moyenne_salaires=Avg('salaire'),
             nombre_salaries=Count('salaire'),
         )
+
+        if statistiques['moyenne_salaires'] is not None:
+            statistiques['moyenne_salaires'] = round(statistiques['moyenne_salaires'], 2)
 
         statistiques['total'] = len(liste)
 
@@ -173,6 +226,9 @@ class BanqueListCreate(generics.ListCreateAPIView):
         )
         statistiques['nombre_comptes'] = Salarie.objects.count()
         statistiques['total'] = len(liste)
+
+        if statistiques['moyenne_salaires'] is not None:
+            statistiques['moyenne_salaires'] = round(statistiques['moyenne_salaires'], 2)
         response_data = {
             'statistiques': statistiques,
             'liste': liste
@@ -280,7 +336,6 @@ class ChequeListCreate(generics.ListCreateAPIView):
 
     def get(self, request, *args, **kwargs):
         utilisateur = request.user
-
         
         queryset = Cheque.objects.all()
 
@@ -292,10 +347,13 @@ class ChequeListCreate(generics.ListCreateAPIView):
         statistiques['nombre_comptes'] = Salarie.objects.count()
 
         for cheque in liste :
-            print(cheque)
-            montant = EtatSalarie.objects.aggregate(montant=Sum('montant_net')) 
-            if montant['montant'] :
-                montant = montant['montant']
+            # print(cheque['etat'])
+            if cheque['etat']:
+                montant = EtatSalarie.objects.filter(etat__id=cheque['etat']['id']).aggregate(montant=Sum('montant_net')) 
+                if montant['montant'] :
+                    montant = montant['montant']
+                else :
+                    montant = 0
             else :
                 montant = 0
             cheque['montant'] = montant
@@ -427,13 +485,17 @@ def creer_etat(request):
 
             df = pd.read_csv(f'{sheet_url}/export?format=csv')
 
-            creer_etats_salaries(df, etat)
+            creer_etats_salaries(df, etat, request.user.etablissement)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @transaction.atomic
-def creer_etats_salaries(df, etat):
+def creer_etats_salaries(df, etat, etablissement):
+    # Récupérer la liste des NNI des salariés depuis le fichier Excel
+    nni_list = df['nni'].tolist()
+
+    # Créer des États de salaire pour les salariés présents dans le fichier Excel
     for index, row in df.iterrows():
         nni = row['nni']
         montant_net = row['montant_net']
@@ -446,7 +508,18 @@ def creer_etats_salaries(df, etat):
                 etat=etat
             )
         except Salarie.DoesNotExist:
-          print(f"Le salarie n'existe pas")
+            print(f"Le salarie avec NNI {nni} n'existe pas")
+
+    # Récupérer les salariés dont les NNI ne sont pas dans le fichier Excel
+    salarie_non_presents = Salarie.objects.exclude(nni__in=nni_list).filter(etablissement=etablissement, active=True)
+
+    # Créer un EtatSalarie avec un montant de 0 pour ces salariés
+    for salarie in salarie_non_presents:
+        EtatSalarie.objects.create(
+            montant_net=0,
+            salarie=salarie,
+            etat=etat
+        )
 
 
 @api_view(['GET'])
@@ -572,6 +645,107 @@ class UtilisateurRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         return UtilisateurCustomSerializer
 
 
+@api_view(['PUT'])
+def activer_banque(request, id):
+    try:
+        banque = Banque.objects.filter(id=id).first()
+        if banque :
+            banque.active = True
+            banque.save()
+        
+        else :
+            return Response({"message" : "Banque n'est pas trouvée"}, status=404)
+        return Response({"message" : "Banque activée avec succès"})
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+
+
+@api_view(['PUT'])
+def desactiver_banque(request, id):
+    try:
+        banque = Banque.objects.filter(id=id).first()
+        if banque :
+            banque.active = False
+            banque.save()
+        
+        else :
+            return Response({"message" : "Banque n'est pas trouvée"}, status=404)
+        return Response({"message" : "Banque desactivée avec succès"})
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+    
+
+@api_view(['PUT'])
+def activer_etablissement(request, id):
+    try:
+        objet = Etablissement.objects.filter(id=id).first()
+        if objet :
+            objet.active = True
+            objet.save()
+        
+        else :
+            return Response({"message" : "Objet n'est pas trouvée"}, status=404)
+        return Response({"message" : "Objet activée avec succès"})
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+
+
+@api_view(['PUT'])
+def desactiver_etablissement(request, id):
+    try:
+        objet = Etablissement.objects.filter(id=id).first()
+        if objet :
+            objet.active = False
+            objet.save()
+        
+        else :
+            return Response({"message" : "Objet n'est pas trouvée"}, status=404)
+        return Response({"message" : "Objet desactivée avec succès"})
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+    
+
+@api_view(['PUT'])
+def activer_salarie(request, id):
+    try:
+        objet = Salarie.objects.filter(id=id).first()
+        if objet :
+            objet.active = True
+            objet.save()
+        
+        else :
+            return Response({"message" : "Objet n'est pas trouvée"}, status=404)
+        return Response({"message" : "Objet activée avec succès"})
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+
+
+@api_view(['PUT'])
+def desactiver_salarie(request, id):
+    try:
+        objet = Salarie.objects.filter(id=id).first()
+        if objet :
+            objet.active = False
+            objet.save()
+        
+        else :
+            return Response({"message" : "Objet n'est pas trouvée"}, status=404)
+        return Response({"message" : "Objet desactivée avec succès"})
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+
 @api_view(['GET'])
 def cheque_etablissement(request):
     utilisateur = request.user
@@ -579,6 +753,32 @@ def cheque_etablissement(request):
         cheques = Cheque.objects.filter(etablissement=utilisateur.etablissement)
         cheques = ChequeSerializer(cheques, many=True).data
         return Response(cheques)
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+    
+
+@api_view(['GET'])
+def etablissement_active(request):
+    utilisateur = request.user
+    try:
+        objets = Etablissement.objects.filter(active=True)
+        objets = EtablissementSerializer(objets, many=True).data
+        return Response(objets)
+    except Exception as e:
+        return Response({
+            "erreur": f"{e}"
+        }, status=500)
+    
+
+@api_view(['GET'])
+def banque_active(request):
+    utilisateur = request.user
+    try:
+        objets = Banque.objects.filter(active=True)
+        objets = BanqueSerializer(objets, many=True).data
+        return Response(objets)
     except Exception as e:
         return Response({
             "erreur": f"{e}"
@@ -652,6 +852,19 @@ def Utilisateur_profil(request):
             "status": 500,
             "message": f"Failed to load Utilisateurs profile {e}"
         })
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def modifier_informations(request):
+    user = request.user
+    serializer = UtilisateurSerializer(user, data=request.data, partial=True)
+
+
+    if serializer.is_valid() :
+        serializer.save()
+        return Response(serializer.data)
+    return Response({"bad request"})
 
 
 @api_view(['PUT'])

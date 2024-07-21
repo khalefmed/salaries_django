@@ -70,20 +70,23 @@ class SalarieCustomSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ChequeCustomSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Cheque
-        fields = '__all__'
 
 
 
 class EtatCustomSerializer(serializers.ModelSerializer):
-    cheque = ChequeSerializer()
     etablissement = EtablissementSerializer()
 
     class Meta:
         model = Etat
         fields = '__all__'
+    
+
+class ChequeCustomSerializer(serializers.ModelSerializer):
+    etat = EtatCustomSerializer()
+    class Meta:
+        model = Cheque
+        fields = '__all__'
+
 
 class EtatSalarieCustomSerializer(serializers.ModelSerializer):
     salarie = SalarieCustomSerializer()
