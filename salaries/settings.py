@@ -17,7 +17,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 ## I'm just here to modify the project
-## some bullshit
+
 
 
 #....
