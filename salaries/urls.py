@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
+    ### I'm here to modify
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
 ]
